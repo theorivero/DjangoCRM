@@ -58,7 +58,7 @@ def logoutUser(request):
 def home(request):
 	customers = Customer.objects.all()
 	orders = Order.objects.all().order_by('-date_created')[:5]
-
+	count_orders = Order.objects.all().count() 
 	delivered = Order.objects.filter(status='Delivered')
 	pending = Order.objects.filter(status='Pending')
 
@@ -66,7 +66,8 @@ def home(request):
 		"customers" : customers,
 		"orders" : orders,
 		"delivered" : delivered,
-		"pending" : pending
+		"pending" : pending,
+		"count_orders" : count_orders
 
 	}
 	return render(request, 'accounts/dashboard.html', context)
@@ -122,8 +123,20 @@ def updateOrder(request, pk):
 
 	context = {'form': form}
 
-	return render(request, 'accounts/order_form.html', context)
+	return render(request, 'accounts/single_order_form.html', context)
 
+
+@login_required(login_url='login')
+def createSingleOrder(request):
+	form = OrderForm()
+
+	if request.method == 'POST':
+		form = OrderForm(request.POST)
+		if form.is_valid():
+			form.save()
+			return redirect('/')
+	context = {'form':form}
+	return render(request, 'accounts/single_order_form.html', context)
 
 @login_required(login_url='login')
 def deleteOrder(request, pk):
