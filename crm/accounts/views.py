@@ -57,7 +57,7 @@ def logoutUser(request):
 @login_required(login_url='login')
 def home(request):
 	customers = Customer.objects.all()
-	orders = Order.objects.all()
+	orders = Order.objects.all().order_by('-date_created')[:5]
 
 	delivered = Order.objects.filter(status='Delivered')
 	pending = Order.objects.filter(status='Pending')
