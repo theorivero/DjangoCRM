@@ -7,47 +7,50 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 
+from django.contrib.auth.models import Group
+
 from .models import *
 from .forms import *
 from .filters import *
+from .decorators import  *
 
 
-def registerPage(request):
-	if request.user.is_authenticated:
-		return redirect('/')
-	else:
-		form = CreateUserForm()
-		if request.method == 'POST':
-			form = CreateUserForm(request.POST)
-			if form.is_valid():
-				form.save()
-				user = form.cleaned_data.get('username')
-				messages.success(request, 'Account was created for ' + user)
+@unauthenticated_user
+def registerPage(request):	
+	form = CreateUserForm()
+	if request.method == 'POST':
+		form = CreateUserForm(request.POST)
+		if form.is_valid():
+			user = form.save()
+			username = form.cleaned_data.get('username')
 
-				return redirect('login')
+			group = Group.objects.get(name='customer')
+			user.groups.add(group)
 
-		context = {'form':form}
-		
-		return render(request, 'accounts/register.html', context)
+			messages.success(request, 'Account was created for ' + username)
 
-def loginPage(request):
-	if request.user.is_authenticated:
-		return redirect('/')
-	else:
-		if request.method == "POST":
-			username = request.POST.get('username')
-			password = request.POST.get('password')
+			return redirect('login')
 
-			user = authenticate(request, username=username, password=password)
+	context = {'form':form}
+	
+	return render(request, 'accounts/register.html', context)
 
-			if user is not None:
-				login(request, user)
-				return redirect('/')
-			else:
-				messages.info(request, 'Username or password is incorect')
+@unauthenticated_user
+def loginPage(request):	
+	if request.method == "POST":
+		username = request.POST.get('username')
+		password = request.POST.get('password')
 
-		context = {}
-		return render(request, 'accounts/login.html', context)
+		user = authenticate(request, username=username, password=password)
+
+		if user is not None:
+			login(request, user)
+			return redirect('/')
+		else:
+			messages.info(request, 'Username or password is incorect')
+
+	context = {}
+	return render(request, 'accounts/login.html', context)
 
 
 def logoutUser(request):
@@ -55,6 +58,7 @@ def logoutUser(request):
 	return redirect('login')
 
 @login_required(login_url='login')
+@admin_only
 def home(request):
 	customers = Customer.objects.all()
 	orders = Order.objects.all().order_by('-date_created')[:5]
@@ -72,12 +76,18 @@ def home(request):
 	}
 	return render(request, 'accounts/dashboard.html', context)
 
+def userPage(request):
+	context = {}
+	return render(request, 'accounts/user.html', context)
+
 @login_required(login_url='login')	
+@allowed_users(allowed_roles=['admin'])
 def products(request):
 	products = Product.objects.all()
 	return render(request, 'accounts/products.html', {'products': products})
 
 @login_required(login_url='login')
+@allowed_users(allowed_roles=['admin'])
 def customer(request, pk):
 	customer = Customer.objects.get(id=pk)
 	orders = customer.order_set.all()
@@ -90,6 +100,7 @@ def customer(request, pk):
 
 
 @login_required(login_url='login')
+@allowed_users(allowed_roles=['admin'])
 def createOrder(request, pk):
 	OrderFormSet = inlineformset_factory(Customer, Order, fields=('product', 'status'), extra=5)
 	customer = Customer.objects.get(id=pk)
@@ -108,6 +119,7 @@ def createOrder(request, pk):
 
 
 @login_required(login_url='login')
+@allowed_users(allowed_roles=['admin'])
 def updateOrder(request, pk):
 
 	order = Order.objects.get(id=pk)
@@ -127,6 +139,7 @@ def updateOrder(request, pk):
 
 
 @login_required(login_url='login')
+@allowed_users(allowed_roles=['admin'])
 def createSingleOrder(request):
 	form = OrderForm()
 
@@ -139,6 +152,7 @@ def createSingleOrder(request):
 	return render(request, 'accounts/single_order_form.html', context)
 
 @login_required(login_url='login')
+@allowed_users(allowed_roles=['admin'])
 def deleteOrder(request, pk):
 
 	order = Order.objects.get(id=pk)
@@ -152,6 +166,7 @@ def deleteOrder(request, pk):
 
 
 @login_required(login_url='login')
+@allowed_users(allowed_roles=['admin'])
 def createCustomer(request):
 	form = CustomerForm()
 
@@ -165,6 +180,7 @@ def createCustomer(request):
 
 
 @login_required(login_url='login')
+@allowed_users(allowed_roles=['admin'])
 def updateCustomer(request, pk):
 	customer = Customer.objects.get(id=pk)
 	form = CustomerForm(instance=customer)
@@ -177,7 +193,7 @@ def updateCustomer(request, pk):
 	context ={'form': form}
 	return render(request, 'accounts/customer_form.html', context)
 
-
+@allowed_users(allowed_roles=['admin'])
 @login_required(login_url='login')
 def deleteCustomer(request, pk):
 	customer = Customer.objects.get(id=pk)
